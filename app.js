@@ -1,0 +1,209 @@
+// App.js import React, { useState, useEffect } from 'react';
+import './App.css';
+
+const champions = [
+  { name: 'Aatrox', roles: ['Top'] },
+  { name: 'Ahri', roles: ['Mid'] },
+  { name: 'Akali', roles: ['Top', 'Mid'] },
+  { name: 'Alistar', roles: ['Support'] },
+  { name: 'Amumu', roles: ['Jungle', 'Support'] },
+  { name: 'Anivia', roles: ['Mid'] },
+  { name: 'Annie', roles: ['Mid', 'Support'] },
+  { name: 'Ashe', roles: ['ADC'] },
+  { name: 'AurelionSol', roles: ['Mid'] },
+  { name: 'Azir', roles: ['Mid'] }
+];
+
+const emptySet = {
+  blueBans: [],
+  redBans: [],
+  bluePicks: [],
+  redPicks: [],
+};
+
+function encodeSet(set) {
+  return [
+    ...set.blueBans,
+    '|',
+    ...set.redBans,
+    '|',
+    ...set.bluePicks,
+    '|',
+    ...set.redPicks,
+  ].join(',');
+}
+
+function decodeSet(encoded) {
+  const [bb, rb, bp, rp] = encoded.split('|').map(s => s ? s.split(',') : []);
+  return {
+    blueBans: bb || [],
+    redBans: rb || [],
+    bluePicks: bp || [],
+    redPicks: rp || [],
+  };
+}
+
+function App() {
+  const [sets, setSets] = useState([
+    { ...emptySet },
+    { ...emptySet },
+    { ...emptySet },
+    { ...emptySet },
+    { ...emptySet },
+  ]);
+  const [currentSetIndex, setCurrentSetIndex] = useState(0);
+  const [mode, setMode] = useState('ban-blue');
+  const [filterRole, setFilterRole] = useState('All');
+  const [shareLink, setShareLink] = useState('');
+
+  const currentSet = sets[currentSetIndex];
+
+  const handleChampionClick = (champ) => {
+    const isPickedOrBanned = [
+      ...currentSet.blueBans,
+      ...currentSet.redBans,
+      ...currentSet.bluePicks,
+      ...currentSet.redPicks,
+    ].includes(champ);
+    if (isPickedOrBanned) return;
+
+    const updatedSet = { ...currentSet };
+
+    if (mode === 'ban-blue' && updatedSet.blueBans.length < 5) {
+      updatedSet.blueBans.push(champ);
+    } else if (mode === 'ban-red' && updatedSet.redBans.length < 5) {
+      updatedSet.redBans.push(champ);
+    } else if (mode === 'pick-blue' && updatedSet.bluePicks.length < 5) {
+      updatedSet.bluePicks.push(champ);
+    } else if (mode === 'pick-red' && updatedSet.redPicks.length < 5) {
+      updatedSet.redPicks.push(champ);
+    }
+
+    const updatedSets = [...sets];
+    updatedSets[currentSetIndex] = updatedSet;
+    setSets(updatedSets);
+  };
+
+  const resetCurrentSet = () => {
+    const updatedSets = [...sets];
+    updatedSets[currentSetIndex] = { ...emptySet };
+    setSets(updatedSets);
+    setShareLink('');
+  };
+
+  const filteredChampions = champions.filter((champ) => {
+    if (filterRole === 'All') return true;
+    return champ.roles.includes(filterRole);
+  });
+
+  const generateShareLink = () => {
+    const encoded = encodeSet(currentSet);
+    const url = `${window.location.origin}${window.location.pathname}?set=${currentSetIndex + 1}&data=${encodeURIComponent(encoded)}`;
+    setShareLink(url);
+  };
+
+  // URL 파라미터로 불러오기
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const setNum = parseInt(params.get('set'));
+    const encodedData = params.get('data');
+    if (!isNaN(setNum) && setNum >= 1 && setNum <= 5 && encodedData) {
+      const loadedSet = decodeSet(decodeURIComponent(encodedData));
+      const updatedSets = [...sets];
+      updatedSets[setNum - 1] = loadedSet;
+      setSets(updatedSets);
+      setCurrentSetIndex(setNum - 1);
+    }
+  }, []);
+
+  return (
+    <div className="App">
+      <h1>LoL 밴픽 시뮬레이터 (세트별)</h1>
+
+      <div className="controls">
+        <label>세트 선택:</label>
+        <select onChange={(e) => setCurrentSetIndex(Number(e.target.value))} value={currentSetIndex}>
+          <option value={0}>1세트</option>
+          <option value={1}>2세트</option>
+          <option value={2}>3세트</option>
+          <option value={3}>4세트</option>
+          <option value={4}>5세트</option>
+        </select>
+
+        <select onChange={(e) => setMode(e.target.value)} value={mode}>
+          <option value="ban-blue">블루팀 밴</option>
+          <option value="ban-red">레드팀 밴</option>
+          <option value="pick-blue">블루팀 픽</option>
+          <option value="pick-red">레드팀 픽</option>
+        </select>
+
+        <select onChange={(e) => setFilterRole(e.target.value)} value={filterRole}>
+          <option value="All">전체</option>
+          <option value="Top">탑</option>
+          <option value="Jungle">정글</option>
+          <option value="Mid">미드</option>
+          <option value="ADC">원딜</option>
+          <option value="Support">서폿</option>
+        </select>
+
+        <button onClick={resetCurrentSet}>세트 초기화</button>
+        <button onClick={generateShareLink}>공유 링크 생성</button>
+      </div>
+
+      {shareLink && (
+        <div className="share-link">
+          <strong>공유 링크:</strong><br />
+          <a href={shareLink} target="_blank" rel="noopener noreferrer">{shareLink}</a>
+        </div>
+      )}
+
+      <div className="status">
+        <div>
+          <h3>블루팀 밴</h3>
+          <div>{currentSet.blueBans.join(', ') || '없음'}</div>
+        </div>
+        <div>
+          <h3>레드팀 밴</h3>
+          <div>{currentSet.redBans.join(', ') || '없음'}</div>
+        </div>
+        <div>
+          <h3>블루팀 픽</h3>
+          <div>{currentSet.bluePicks.join(', ') || '없음'}</div>
+        </div>
+        <div>
+          <h3>레드팀 픽</h3>
+          <div>{currentSet.redPicks.join(', ') || '없음'}</div>
+        </div>
+      </div>
+
+      <h2>챔피언 목록</h2>
+      <div className="champion-grid">
+        {filteredChampions.map((champ) => {
+          const isPickedOrBanned = [
+            ...currentSet.blueBans,
+            ...currentSet.redBans,
+            ...currentSet.bluePicks,
+            ...currentSet.redPicks,
+          ].includes(champ.name);
+
+          return (
+            <div
+              key={champ.name}
+              className={`champion-card ${isPickedOrBanned ? 'disabled' : ''}`}
+              onClick={() => !isPickedOrBanned && handleChampionClick(champ.name)}
+            >
+              <img
+                src={`http://ddragon.leagueoflegends.com/cdn/14.6.1/img/champion/${champ.name}.png`}
+                alt={champ.name}
+                className="champion-img"
+              />
+              <div>{champ.name}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export default App;
